@@ -14,8 +14,8 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 	def registerExtenderCallbacks(self, callbacks):
 
 		# Writing streams
-        self.stdout = PrintWriter(callbacks.getStdout(), True)
-        self.stdout.println('Heada extension loaded.')
+		self.stdout = PrintWriter(callbacks.getStdout(), True)
+		self.stdout.println('Heada extension loaded.')
 
 		# Keep a reference to our callbacks object
 		self.callbacks = callbacks
