@@ -33,7 +33,7 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 
 		# Set vars
 		issues 			= []
-		responseHeaders = []
+		responseHeaders	= []
 		messages 		= [baseRequestResponse]
 		response 		= baseRequestResponse.getResponse()
 		headers 		= self.helpers.analyzeResponse(response).getHeaders()
