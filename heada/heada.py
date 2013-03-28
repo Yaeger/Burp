@@ -59,9 +59,9 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 
 		# Server header check
 		# We need to know the value pair, so we pass headers
-		check, version = heada.checkServer(headers)
+		check, versions = heada.checkServer(headers, self.stdout)
 		if check == False:
-			issues.append(ServerIssue(service, url, messages, version))
+			issues.append(ServerIssue(service, url, messages, versions))
 		return issues
 
 	# Remove duplicate issues
@@ -88,13 +88,26 @@ class HeadaCheck():
 				return True
 		return False
 
-	def checkServer(self, headers):
+	def checkServer(self, headers, writer):
+		banners = []
 		for header in headers:
-			if header.split(':')[0].strip() == 'Server':
+			writer.println("Header: " + header)
+			if ':' not in header:
+				continue
+			hdr = header.split(':')[0].strip()
+			val = header.split(':', 1)[1].strip()
+			lhdr = hdr.lower()
+			lval = val.lower()
+
+			if lhdr == 'server':
 				# Server: Apache is already fixed.
-				if header.split(':')[1].strip() == 'Apache':
-					return (True, None)
-				return (False, header.split(':')[1].strip())
+				if lval == 'apache':
+					continue
+				banners.append((hdr, lval))
+			if lhdr == 'x-powered-by' or lhdr == 'x-aspnet-version':
+				banners.append((hdr, lval))
+		if banners:
+			return (False, banners)
 		return (True, None)
 
 class CspIssue(IScanIssue):
@@ -115,7 +128,7 @@ class CspIssue(IScanIssue):
 		return 0
 
 	def getSeverity(self):
-		return 'Low'
+		return 'Information'
 
 	def getConfidence(self):
 		return "Certain"
@@ -210,7 +223,12 @@ class ServerIssue(IScanIssue):
 		return 'Some Remediation Background'
 
 	def getIssueDetail(self):
-		return 'The response contained the version header: ' + self.mversion
+		# Create string to print
+		# i.e. Server: Apache 2
+		versions = ''
+		for k, v in self.mversion:
+			versions += k + ': ' + v + ' '
+		return 'The response contained the version header: ' + versions
 
 	def getRemediationDetail(self):
 		return 'Some Remediation Detail'
