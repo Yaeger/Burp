@@ -46,7 +46,6 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 		for header in headers:
 			responseHeaders.append(header.split(':')[0].strip())
 
-		#TODO: The checks are redundant. Clean this up some how.
 		# CSP check
 		check = heada.checkCsp(responseHeaders)
 		if check == False:
