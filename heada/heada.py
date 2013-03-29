@@ -56,9 +56,19 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 		if check == False:
 			issues.append(HstsIssue(service, url, messages))
 
+		# XSS check
+		check = heada.checkXss(responseHeaders)
+		if check == False:
+			issues.append(XssIssue(service, url, messages))
+
+		# Content Sniffing check
+		check = heada.checkCsniff(responseHeaders)
+		if check == False:
+			issues.append(CsniffIssue(service, url, messages))
+
 		# Server header check
 		# We need to know the value pair, so we pass headers
-		check, versions = heada.checkServer(headers, self.stdout)
+		check, versions = heada.checkServer(headers)
 		if check == False:
 			issues.append(ServerIssue(service, url, messages, versions))
 		return issues
@@ -71,26 +81,42 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 
 
 class HeadaCheck():
-	
-	cspHeaders	= ['X-WebKit-CSP', 'X-Content-Security-Policy', 'Content-Security-Policy']
-	hstsHeaders	= ['Strict-Transport-Security']
+	cspHeaders		= ['x-webkit-csp', 'x-content-security-policy', 'content-security-policy']
+	hstsHeaders		= ['strict-transport-security']
+	serverHeaders 	= ['server']
+	xpowerHeaders 	= ['x-powered-by', 'x-aspnet-version']
+	xssHeaders 		= ['x-xss-protection']
+	csniffHeaders 	= ['x-content-type-options']
 
 	def checkCsp(self, headers):
 		for header in headers:
-			if header in self.cspHeaders:
+			if header.lower() in self.cspHeaders:
 				return True
 		return False
 
 	def checkHsts(self, headers):
 		for header in headers:
-			if header in self.hstsHeaders:
+			if header.lower() in self.hstsHeaders:
 				return True
 		return False
 
-	def checkServer(self, headers, writer):
+	def checkXss(self, headers):
+		for header in headers:
+			if header.lower() in self.xssHeaders:
+				return True
+		return False
+
+	def checkCsniff(self, headers):
+		for header in headers:
+			if header.lower() in self.csniffHeaders:
+				return True
+		return False
+
+	def checkServer(self, headers):
 		banners = []
 		for header in headers:
-			writer.println("Header: " + header)
+			# If the header is not a name value pair, skip
+			# Example would be: HTTP / 200 OK
 			if ':' not in header:
 				continue
 			hdr = header.split(':')[0].strip()
@@ -98,12 +124,12 @@ class HeadaCheck():
 			lhdr = hdr.lower()
 			lval = val.lower()
 
-			if lhdr == 'server':
+			if lhdr in self.serverHeaders:
 				# Server: Apache is already fixed.
 				if lval == 'apache':
 					continue
 				banners.append((hdr, lval))
-			if lhdr == 'x-powered-by' or lhdr == 'x-aspnet-version':
+			if lhdr in self.xpowerHeaders:
 				banners.append((hdr, lval))
 		if banners:
 			return (False, banners)
@@ -112,7 +138,6 @@ class HeadaCheck():
 class CspIssue(IScanIssue):
 
 	def __init__(self, service, url, httpMessages):
-
 		self.mservice 		= service
 		self.murl 			= url
 		self.mhttpMessages 	= httpMessages
@@ -153,7 +178,6 @@ class CspIssue(IScanIssue):
 class HstsIssue(IScanIssue):
 
 	def __init__(self, service, url, httpMessages):
-
 		self.mservice 		= service
 		self.murl 			= url
 		self.mhttpMessages 	= httpMessages
@@ -191,10 +215,89 @@ class HstsIssue(IScanIssue):
 	def getHttpService(self):
 		return self.mservice
 
+class XssIssue(IScanIssue):
+
+	def __init__(self, service, url, httpMessages):
+		self.mservice 		= service
+		self.murl 			= url
+		self.mhttpMessages 	= httpMessages
+
+	def getUrl(self):
+		return self.murl
+
+	def getIssueName(self):
+		return 'XSS Protection Header Not Enabled'
+
+	def getIssueType(self):
+		return 0
+
+	def getSeverity(self):
+		return 'Low'
+
+	def getConfidence(self):
+		return "Certain"
+
+	def getIssueBackground(self):
+		return 'Some issue background'
+
+	def getRemediationBackground(self):
+		return 'Some Remediation Background'
+
+	def getIssueDetail(self):
+		return 'The response did not contain the x-xss-protection header.'
+
+	def getRemediationDetail(self):
+		return 'Some Remediation Detail'
+
+	def getHttpMessages(self):
+		return self.mhttpMessages
+
+	def getHttpService(self):
+		return self.mservice
+
+class CsniffIssue(IScanIssue):
+
+	def __init__(self, service, url, httpMessages):
+		self.mservice 		= service
+		self.murl 			= url
+		self.mhttpMessages 	= httpMessages
+
+	def getUrl(self):
+		return self.murl
+
+	def getIssueName(self):
+		return 'Content Sniffing Prevention Header Not Enabled'
+
+	def getIssueType(self):
+		return 0
+
+	def getSeverity(self):
+		return 'Low'
+
+	def getConfidence(self):
+		return "Certain"
+
+	def getIssueBackground(self):
+		return 'Some issue background'
+
+	def getRemediationBackground(self):
+		return 'Some Remediation Background'
+
+	def getIssueDetail(self):
+		return 'The response did not contain the x-content-type-options header.'
+
+	def getRemediationDetail(self):
+		return 'Some Remediation Detail'
+
+	def getHttpMessages(self):
+		return self.mhttpMessages
+
+	def getHttpService(self):
+		return self.mservice
+
 class ServerIssue(IScanIssue):
 
 	def __init__(self, service, url, httpMessages, version):
-
 		self.mservice 		= service
 		self.murl 			= url
 		self.mhttpMessages 	= httpMessages
