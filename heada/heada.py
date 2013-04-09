@@ -49,7 +49,13 @@ class BurpExtender(IBurpExtender, IScannerCheck):
 		# CSP check
 		check = heada.checkCsp(responseHeaders)
 		if check == False:
-			issues.append(CspIssue(service, url, messages))
+			issues.append(CspIssue(service, url, messages, None))
+
+		# CSP value check
+		self.stdout.println('Checking csp value')
+		check, errors = heada.checkCspVal(headers, self.stdout)
+		if check == False:
+			issues.append(CspIssue(service, url, messages, errors))
 
 		# HSTS check
 		check = heada.checkHsts(responseHeaders)
@@ -94,6 +100,35 @@ class HeadaCheck():
 				return True
 		return False
 
+	def checkCspVal(self, headers, writer):
+		errors = []
+		for header in headers:
+			# If the header is not a name value pair, skip
+			# Example would be: HTTP / 200 OK
+			if ':' not in header:
+				continue
+			if header.split(':',1)[0].lower() in self.cspHeaders:
+				values = header.split(':', 1)[1].strip()
+				if 'unsafe-inline' in values or 'unsafe-eval' in values:
+					errors.append('unsafe')
+				if '*' in values:
+					writer.println('Wildcard! *!')
+					errors.append('wildcard')
+				vals = values.split(';')
+				for val in vals:
+					writer.println('val: ' + val)
+					if '' in val:
+						continue
+					if len(val.strip().split(' ')) != 1:
+						continue
+					else:
+						writer.println('Wildcard! Empty!')
+						errors.append('wildcard')
+		if errors:
+			return (False, errors)
+		return (True, None)
+
+
 	def checkHsts(self, headers):
 		for header in headers:
 			if header.lower() in self.hstsHeaders:
@@ -137,10 +172,11 @@ class HeadaCheck():
 
 class CspIssue(IScanIssue):
 
-	def __init__(self, service, url, httpMessages):
+	def __init__(self, service, url, httpMessages, errors):
 		self.mservice 		= service
 		self.murl 			= url
 		self.mhttpMessages 	= httpMessages
+		self.errors			= errors
 
 	def getUrl(self):
 		return self.murl
@@ -164,6 +200,13 @@ class CspIssue(IScanIssue):
 		return 'Some Remediation Background'
 
 	def getIssueDetail(self):
+		message = ''
+		if self.errors:
+			if 'unsafe' in self.errors:
+				message += 'Unsafe rules have been found.'
+			if 'wildcard' in self.errors:
+				message += ' Wildcard values have been found.'
+			return message
 		return 'The response did not contain any of the Content Security Policy headers.'
 
 	def getRemediationDetail(self):
